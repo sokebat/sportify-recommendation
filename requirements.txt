@@ -6,3 +6,6 @@ joblib
 pyyaml
 pytest
 python-dotenv
+seaborn
+wordcloud
+IPython.display
