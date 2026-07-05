@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+@theme {
+  --color-spotify-black: #121212;
+  --color-spotify-elevated: #181818;
+  --color-spotify-hover: #282828;
+  --color-spotify-green: #1db954;
+  --color-spotify-green-hover: #1ed760;
+  --color-spotify-text-secondary: #b3b3b3;
+  --color-spotify-border: #2a2a2a;
+
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+}
+
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 3s linear infinite;
+}
+
+body {
+  background-color: var(--color-spotify-black);
+  color: white;
+  font-family: var(--font-sans);
+}

@@ -55,10 +55,4 @@ npm run dev   # http://localhost:3000
 Without the backend running, pages still render (loading skeletons →
 each row just fails silently) - see [`frontend/README.md`](frontend/README.md)
 for the full page/feature list and folder layout.
-
-## Notes
-
-- Two independent apps, two independent dependency trees (Python venv for
-  the backend, node_modules for the frontend) - no shared build step.
-- `frontend/` has its own nested `.git` (left over from `create-next-app`);
-  everything else is tracked by this repo's root `.git`.
+ 
