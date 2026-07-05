@@ -1,9 +1,0 @@
-{
-  "sample_size": 1000,
-  "k": 10,
-  "genre_precision_at_k": 0.7061,
-  "artist_precision_at_k": 0.16090000000000004,
-  "average_similarity_at_k": 0.8325790575540952,
-  "catalog_coverage": 0.10405616224648986,
-  "popularity_baseline_genre_precision_at_10": 0.009300000000000001
-}

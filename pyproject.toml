@@ -1,9 +1,0 @@
-[project]
-name = "ml-project-template"
-version = "0.1.0"
-description = "Production-ready ML project template"
-requires-python = ">=3.10"
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-pythonpath = ["."]
