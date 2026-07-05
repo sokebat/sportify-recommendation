@@ -1,0 +1,17 @@
+pandas
+numpy
+scikit-learn
+scipy
+matplotlib
+joblib
+pyyaml
+pytest
+python-dotenv
+seaborn
+wordcloud
+ipython
+jupyter
+nbconvert
+fastapi
+uvicorn[standard]
+httpx

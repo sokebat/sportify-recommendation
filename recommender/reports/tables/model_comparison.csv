@@ -1,0 +1,6 @@
+model,use_case,genre_precision_at_k,artist_precision_at_k,avg_popularity,diversity_score,novelty_score,catalog_coverage,avg_response_time_s
+Cosine Similarity,similar_song,1.0,0.134,31.432,0.1,0.6857,0.0219,0.0061
+KNN,playlist,1.0,,36.6533,0.1,0.6335,0.0017,0.0151
+Weighted Mood Similarity,mood,,,85.9,0.775,0.141,0.0004,0.0083
+TF-IDF,genre,1.0,,60.76,0.1,0.3924,0.0017,0.0234
+Hybrid (09),similar_song,0.714,0.204,31.403,0.2965,0.686,0.022,0.0806

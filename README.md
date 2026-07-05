@@ -1,68 +1,64 @@
-# ML Project Template
+# Sportify Recommendation
 
-A clean, production-ready machine learning project structure.
+A Spotify UI clone backed by a real content-based recommender: pick a song, a
+mood, a genre, or an artist, and get back tracks actually chosen by trained
+models running over ~90k Spotify tracks - not mocked data.
 
-## Project Structure
-
-```text
-ml_project_template/
-├── data/
-│   ├── raw/              # Original untouched data
-│   ├── interim/          # Temporary transformed data
-│   ├── processed/        # Final training-ready data
-│   └── external/         # Third-party data
-├── notebooks/            # EDA and experiments
-├── src/
-│   ├── config/           # Config loading
-│   ├── data/             # Data loading and preprocessing
-│   ├── features/         # Feature engineering
-│   ├── models/           # Model definitions
-│   ├── training/         # Training pipeline
-│   ├── evaluation/       # Metrics and evaluation
-│   ├── inference/        # Prediction code
-│   └── utils/            # Helper functions
-├── configs/              # YAML config files
-├── models/               # Saved model artifacts
-├── reports/              # Reports and visualizations
-├── tests/                # Unit tests
-├── logs/                 # Runtime logs
-├── requirements.txt
-├── pyproject.toml
-├── Dockerfile
-└── Makefile
+```
+┌───────────────────────┐        HTTP        ┌──────────────────────────┐
+│  frontend (Next.js)   │ ──────────────────▶ │  recommender (FastAPI)   │
+│  Spotify-styled UI     │ ◀────────────────── │  content-based models    │
+└───────────────────────┘                     └──────────────────────────┘
 ```
 
-## Setup
+## Structure
+
+| Folder | What it is |
+| --- | --- |
+| [`frontend/`](frontend/README.md) | Next.js 16 + React 19 + TypeScript + Tailwind v4 - the Spotify-styled UI |
+| [`recommender/`](recommender/README.md) | Notebooks (data cleaning → features → 4 trained models) + a FastAPI service that serves them |
+
+## Features
+
+- **Home** - popular tracks, mood and genre rows, all real recommendations
+- **Search** - free-text song search with live autocomplete
+- **Similar song** - cosine similarity over audio features, genre-gated
+- **Mood** - happy / angry / sad / calm, ranked by a weighted centroid + popularity
+- **Genre** - TF-IDF text matching over genre/mood/tempo descriptors
+- **Build a playlist** - add several songs, get a popularity-weighted KNN blend of what fits them all
+- **Artist lookup**, **album art** (proxied from Spotify's public oEmbed), and a **login → onboarding** flow that shows real picks for the genre/mood you chose
+
+## Running it locally
+
+Two servers, both need to be up for the UI to show real data.
+
+**1. Backend** (from `recommender/`):
 
 ```bash
-python -m venv venv
-source venv/bin/activate   # Mac/Linux
-# venv\Scripts\activate   # Windows
-
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
+make api   # http://127.0.0.1:8000
 ```
 
-## Run Training
+Needs the processed catalog + trained model artifacts to already exist -
+see [`recommender/README.md`](recommender/README.md) for which notebooks
+produce them.
+
+**2. Frontend** (from `frontend/`):
 
 ```bash
-python -m src.training.train --config configs/config.yaml
+npm install   # or pnpm install
+cp .env.example .env.local   # NEXT_PUBLIC_API_BASE_URL, defaults to the URL above
+npm run dev   # http://localhost:3000
 ```
 
-## Run Inference
-
-```bash
-python -m src.inference.predict --input data/processed/sample.csv
-```
-
-## Run Tests
-
-```bash
-pytest
-```
+Without the backend running, pages still render (loading skeletons →
+each row just fails silently) - see [`frontend/README.md`](frontend/README.md)
+for the full page/feature list and folder layout.
 
 ## Notes
 
-- Keep raw data unchanged.
-- Put reusable code inside `src/`.
-- Use notebooks only for exploration, not production logic.
-- Save trained models inside `models/`.
+- Two independent apps, two independent dependency trees (Python venv for
+  the backend, node_modules for the frontend) - no shared build step.
+- `frontend/` has its own nested `.git` (left over from `create-next-app`);
+  everything else is tracked by this repo's root `.git`.
