@@ -37,7 +37,7 @@ Two servers, both need to be up for the UI to show real data.
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-make api   # http://127.0.0.1:8000
+ uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000 # http://127.0.0.1:8000
 ```
 
 Needs the processed catalog + trained model artifacts to already exist -
