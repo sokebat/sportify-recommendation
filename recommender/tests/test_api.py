@@ -8,11 +8,14 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.api.main import app
+from src.api.state import state
 
 
 @pytest.fixture(scope="module")
 def client():
     with TestClient(app) as test_client:
+        if not state.loaded:
+            pytest.skip("catalog artifacts not built - run notebooks/01-09 (see README)")
         yield test_client
 
 

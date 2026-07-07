@@ -15,7 +15,14 @@ PROJECT_DIR = Path(__file__).resolve().parents[1]
 
 @pytest.fixture(scope="session")
 def artifacts():
-    return load_artifacts(PROJECT_DIR)
+    try:
+        return load_artifacts(PROJECT_DIR)
+    except FileNotFoundError as error:
+        # Fresh checkout without the generated artifacts: skip (with the
+        # build instructions) rather than error the whole suite - the
+        # artifact-free tests (Spotify client, external API, normalizers)
+        # still run.
+        pytest.skip(str(error))
 
 
 @pytest.fixture(scope="session")

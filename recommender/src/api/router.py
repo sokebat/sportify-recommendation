@@ -1,8 +1,10 @@
 import pandas as pd
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from src.api.schemas import (
     ArtistRequest,
+    ExternalRecommendationsResponse,
+    ExternalRecommendRequest,
     GenreRequest,
     HealthResponse,
     MoodRequest,
@@ -13,19 +15,59 @@ from src.api.schemas import (
     SimilarSongRequest,
     Song,
 )
+from src.api.spotify import fetch_artist_by_name
 from src.api.state import state
-from src.recommendation.catalog import popular_songs, search_songs, songs_by_artist
+from src.recommendation.catalog import (
+    RESULT_COLUMNS,
+    normalize_artist,
+    popular_songs,
+    resolve_external_track,
+    search_songs,
+    songs_by_artist,
+)
 from src.recommendation.discover import recommend_discover
 from src.recommendation.genre import recommend_by_genre
 from src.recommendation.mood import recommend_by_mood
 from src.recommendation.playlist import recommend_for_playlist
 from src.recommendation.similar_song import recommend_similar_songs
 
-router = APIRouter(prefix="/recommend", tags=["recommendations"])
+def require_catalog() -> None:
+    """Every /recommend endpoint needs the trained artifacts; answer with a
+    clear 503 (rather than an AttributeError 500) when they aren't built yet."""
+    if not state.loaded:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Catalog not loaded - run notebooks/01-09 to build "
+                "data/processed and models/content_based, then restart the API."
+            ),
+        )
+
+
+router = APIRouter(prefix="/recommend", tags=["recommendations"], dependencies=[Depends(require_catalog)])
+
+# Spotify's genre taxonomy is full of micro-genres ("dance pop", "alt z")
+# that don't land on a catalog genre slug as-is (recommend_by_genre
+# substring-matches on the first word of the query) - map the common ones.
+SPOTIFY_GENRE_ALIASES = {
+    "r&b": "r-n-b",
+    "rhythm and blues": "r-n-b",
+    "hip hop": "hip-hop",
+    "trap": "hip-hop",
+    "dance pop": "pop",
+    "pop rap": "hip-hop",
+    "electronica": "electronic",
+    "edm": "electronic",
+    "singer-songwriter pop": "singer-songwriter",
+}
 
 
 def _to_response(df: pd.DataFrame) -> RecommendationsResponse:
     return RecommendationsResponse(results=[Song(**row) for row in df.to_dict(orient="records")])
+
+
+def _to_songs(df: pd.DataFrame) -> list[Song]:
+    return [Song(**row) for row in df.to_dict(orient="records")]
 
 
 @router.post("/similar-song")
@@ -84,6 +126,56 @@ def discover(payload: SimilarSongRequest) -> RecommendationsResponse:
     if recs is None:
         raise HTTPException(status_code=404, detail=f"Song not found: {payload.song_name!r}")
     return _to_response(recs)
+
+
+@router.post("/from-external")
+async def from_external(payload: ExternalRecommendRequest) -> ExternalRecommendationsResponse:
+    """Recommendations seeded by a track that came from Spotify (the trending
+    chart, an artist's popular tracks) rather than the catalog. The models
+    only know the catalog, so the external track is bridged in with a
+    fallback chain: exact track match (by Spotify ID, then by name) -> the
+    artist's most popular catalog track -> its genre."""
+    index = resolve_external_track(state.tracks, payload.track, payload.artist, spotify_id=payload.spotify_id)
+    if index is not None:
+        seed = state.tracks.loc[[index], RESULT_COLUMNS].to_dict(orient="records")[0]
+        recs = recommend_similar_songs(
+            state.tracks, state.sound_matrix, seed["track_name"], seed["artists"], top_n=payload.n,
+        )
+        return ExternalRecommendationsResponse(
+            results=_to_songs(recs), matched_by="track", seed=Song(**seed),
+        )
+
+    artist_songs = songs_by_artist(state.tracks, normalize_artist(payload.artist), limit=1)
+    if not artist_songs.empty:
+        seed = artist_songs.to_dict(orient="records")[0]
+        recs = recommend_similar_songs(
+            state.tracks, state.sound_matrix, seed["track_name"], seed["artists"], top_n=payload.n,
+        )
+        if recs is not None:
+            return ExternalRecommendationsResponse(
+                results=_to_songs(recs), matched_by="artist", seed=Song(**seed),
+            )
+
+    # Last resort: recommend within the track's genre. The payload usually
+    # carries it (trending items do); otherwise ask Spotify - tracks don't
+    # carry genre themselves, so this falls back to the artist's genres.
+    genre = payload.genre
+    if not genre:
+        artist_info = await fetch_artist_by_name(payload.artist)
+        genres = (artist_info or {}).get("genres") or []
+        genre = genres[0] if genres else None
+    if genre:
+        genre = SPOTIFY_GENRE_ALIASES.get(genre.strip().lower(), genre)
+        recs = recommend_by_genre(
+            state.tracks, state.genre_matrix, state.genre_vectorizer, genre, top_n=payload.n,
+        )
+        if not recs.empty:
+            return ExternalRecommendationsResponse(results=_to_songs(recs), matched_by="genre")
+
+    raise HTTPException(
+        status_code=404,
+        detail=f"Could not match {payload.track!r} by {payload.artist!r} to the catalog",
+    )
 
 
 health_router = APIRouter(tags=["health"])

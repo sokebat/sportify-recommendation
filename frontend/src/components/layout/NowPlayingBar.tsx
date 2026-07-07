@@ -10,6 +10,12 @@ interface NowPlayingBarProps {
 }
 
 export function NowPlayingBar({ currentSong, isPlaying, onTogglePlay }: NowPlayingBarProps) {
+  // Externally sourced songs already carry their own spotify_url; catalog
+  // songs don't need a fetch for this at all - their track_id IS a real
+  // Spotify track ID, so the link is fully derivable client-side.
+  const spotifyUrl =
+    currentSong?.spotify_url ?? (currentSong?.track_id ? `https://open.spotify.com/track/${currentSong.track_id}` : undefined)
+
   if (!currentSong) {
     return (
       <footer className="h-20 bg-spotify-elevated border-t border-spotify-border flex items-center justify-center">
@@ -46,7 +52,28 @@ export function NowPlayingBar({ currentSong, isPlaying, onTogglePlay }: NowPlayi
         </button>
       </div>
 
-      <div className="w-1/3" />
+      <div className="w-1/3 flex items-center justify-end">
+        {spotifyUrl && (
+          <a
+            href={spotifyUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-2 text-spotify-text-secondary hover:text-white text-xs font-semibold transition-colors"
+          >
+            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
+              <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2" />
+              <path
+                d="M7 9.5c2.8-.8 6.4-.6 8.7.8M7.3 12.3c2.3-.6 5.3-.4 7.2.7M7.6 14.9c1.9-.4 4.3-.3 5.9.6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+              />
+            </svg>
+            Open in Spotify
+          </a>
+        )}
+      </div>
     </footer>
   )
 }

@@ -26,7 +26,7 @@ models running over ~90k Spotify tracks - not mocked data.
 - **Mood** - happy / angry / sad / calm, ranked by a weighted centroid + popularity
 - **Genre** - TF-IDF text matching over genre/mood/tempo descriptors
 - **Build a playlist** - add several songs, get a popularity-weighted KNN blend of what fits them all
-- **Artist lookup**, **album art** (proxied from Spotify's public oEmbed), and a **login → onboarding** flow that shows real picks for the genre/mood you chose
+- **Artist lookup**, **album art**, a **live Global Top 50 chart**, and a **login → onboarding** flow that shows real picks for the genre/mood you chose - all backed by the [Spotify Web API](https://developer.spotify.com/documentation/web-api)
 
 ## Running it locally
 

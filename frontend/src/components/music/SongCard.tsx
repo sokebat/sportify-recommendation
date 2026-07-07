@@ -8,7 +8,7 @@ export function SongCard({ song, onPlay }: { song: Song; onPlay?: (song: Song) =
       className="bg-spotify-elevated hover:bg-spotify-hover rounded-md p-3 transition-colors duration-200 cursor-pointer group flex flex-col gap-3"
     >
       <div className="relative aspect-square w-full rounded overflow-hidden">
-        <TrackCoverImage trackId={song.track_id} className="absolute inset-0 h-full w-full" />
+        <TrackCoverImage trackId={song.track_id} src={song.cover_url} className="absolute inset-0 h-full w-full" />
         <button
           className="absolute bottom-2 right-2 w-10 h-10 rounded-full bg-spotify-green flex items-center justify-center opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-200 shadow-lg"
         >

@@ -4,12 +4,22 @@ import { useState } from 'react'
 import { cn } from '@/lib/cn'
 import { getCoverUrl } from '@/services/api/covers'
 
-/** Album art for a track, resolved through the backend's /cover/{track_id}
- * redirect. Falls back to a plain gradient tile - with no track_id, no
- * cover on record, or a broken image load - instead of a dead <img>. */
-export function TrackCoverImage({ trackId, className }: { trackId?: string; className?: string }) {
+/** Album art for a track: a direct URL when the caller already has one
+ * (externally sourced tracks carry Spotify CDN art), otherwise resolved
+ * through the backend's /cover/{track_id} redirect. Falls back to a plain
+ * gradient tile - with no art, no track_id, or a broken image load -
+ * instead of a dead <img>. */
+export function TrackCoverImage({
+  trackId,
+  src,
+  className,
+}: {
+  trackId?: string
+  src?: string | null
+  className?: string
+}) {
   const [imageFailed, setImageFailed] = useState(false)
-  const coverUrl = getCoverUrl(trackId)
+  const coverUrl = src ?? getCoverUrl(trackId)
 
   if (!coverUrl || imageFailed) {
     return (
