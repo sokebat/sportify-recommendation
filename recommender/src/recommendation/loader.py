@@ -1,16 +1,10 @@
 """
-Loads the tracks catalog and the trained content-based model artifacts from
-models/content_based/ once, so the API can reuse them across requests
-instead of re-reading disk (or refitting anything) per call.
+Loads the tracks catalog and model artifacts once at startup, so we don't
+hit disk on every request.
 
-Artifacts come from five independent model notebooks, each producing one
-file (or file pair) consumed here:
-    notebooks/05_model_cosine.ipynb   -> cosine_feature_matrix.npy    (similar-song, playlist)
-    notebooks/06_model_knn.ipynb      -> knn_config.json              (playlist - which distance metric to use)
-    notebooks/07_model_weighted.ipynb -> weighted_feature_matrix.npy  (mood)
-    notebooks/08_model_tfidf.ipynb    -> tfidf_matrix.npz + tfidf_vectorizer.joblib (genre)
-    notebooks/09_model_hybrid.ipynb   -> content_based_knn_tfidf_weighted_model.joblib
-                                          + tfidf_weighted_feature_matrix.npz (discover)
+Each file comes from its own notebook: 05 (cosine) makes the sound matrix,
+06 (knn) picks the distance metric, 07 (weighted) makes the mood matrix,
+08 (tfidf) makes the genre matrix, 09 (hybrid) makes the discover model.
 """
 import json
 from dataclasses import dataclass

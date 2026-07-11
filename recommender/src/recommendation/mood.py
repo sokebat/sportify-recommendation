@@ -1,21 +1,17 @@
 """
-Mood recommender: ranks tracks within a mood_label bucket by how central they
+Mood recommender: ranks tracks in a mood_label bucket by how close they
 are to that bucket's centroid, blended with popularity so obscure tracks
-don't crowd out songs a listener is actually likely to recognize. See
-notebooks/08_model_weighted.ipynb.
+don't crowd out songs people actually know. See notebooks/08_model_weighted.ipynb.
 """
 import numpy as np
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 
-from src.recommendation.catalog import RESULT_COLUMNS, dedupe_by_track
+from src.recommendation.catalog import RESULT_COLUMNS, finalize_results, top_candidate_indices
 
-POOL_MULTIPLIER = 5
-
-# The frontend's four mood buttons map onto the valence/energy quadrants that
-# mood_label was engineered from (notebooks/04_feature_engineering.ipynb):
-# happy = positive & energetic, angry = negative & energetic,
-# sad = negative & calm, calm = positive & calm.
+# Maps to the valence/energy quadrants mood_label was built from:
+# happy = positive+energetic, angry = negative+energetic,
+# sad = negative+calm, calm = positive+calm.
 MOOD_ALIASES = {
     "happy": "bright_energetic",
     "angry": "intense_dark",
@@ -49,8 +45,5 @@ def recommend_by_mood(
     popularity_norm = tracks.loc[candidate_indices, "popularity"].to_numpy() / 100
 
     combined_score = similarity_weight * similarity + (1 - similarity_weight) * popularity_norm
-    ranked_order = combined_score.argsort()[::-1][: top_n * POOL_MULTIPLIER]
-    ranked_indices = candidate_indices[ranked_order]
-
-    ranked = tracks.loc[ranked_indices, RESULT_COLUMNS]
-    return dedupe_by_track(ranked, top_n).reset_index(drop=True)
+    ranked_indices = top_candidate_indices(candidate_indices, combined_score, top_n)
+    return finalize_results(tracks, ranked_indices, top_n)

@@ -1,20 +1,19 @@
 """
-Discover recommender: nearest neighbors in the hybrid feature space (audio +
-categorical + text signal, weighted and L2-normalized) with no genre gate -
-the deliberate opposite of recommend_similar_songs, which stays inside one
-genre. See notebooks/09_model_hybrid.ipynb: notebook 11's own model
-comparison scores this space highest on diversity (0.30 vs 0.10 for the
-genre-gated models) and ties cosine similarity for novelty (0.686), at the
-cost of weaker genre precision (0.71 vs 1.0) - a fair trade for a "you might
-also like something different" feature.
+Discover recommender: finds nearest neighbors in the hybrid feature space
+(audio + categorical + text), with no genre filter. Genre precision is
+worse than recommend_similar_songs but results are more varied.
 """
 import pandas as pd
 from scipy.sparse import spmatrix
 from sklearn.neighbors import NearestNeighbors
 
-from src.recommendation.catalog import RESULT_COLUMNS, dedupe_by_track, find_track_index
-
-POOL_MULTIPLIER = 5
+from src.recommendation.catalog import (
+    POOL_MULTIPLIER,
+    RESULT_COLUMNS,
+    dedupe_by_track,
+    find_track_index,
+    seed_duplicate_mask,
+)
 
 
 def recommend_discover(
@@ -30,12 +29,9 @@ def recommend_discover(
     if query_index is None:
         return None
 
-    query_name = tracks.loc[query_index, "track_name"]
-    query_artists = tracks.loc[query_index, "artists"]
-    # Same duplicate guard as recommend_similar_songs: exclude every row
-    # that's a copy of the seed (same title+artist under a different genre
-    # split), not just the seed's own row index.
-    is_seed_duplicate = (tracks["track_name"] == query_name) & (tracks["artists"] == query_artists)
+    # Same duplicate guard as recommend_similar_songs - skip every row
+    # that copies the seed, not just the seed's own row.
+    is_seed_duplicate = seed_duplicate_mask(tracks, query_index)
 
     n_neighbors = min(top_n * POOL_MULTIPLIER + 1, hybrid_matrix.shape[0])
     _, neighbor_positions = hybrid_model.kneighbors(hybrid_matrix[query_index], n_neighbors=n_neighbors)

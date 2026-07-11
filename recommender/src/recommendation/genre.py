@@ -1,16 +1,14 @@
 """
-Genre recommender: TF-IDF over a genre/mood/tempo text descriptor per track,
-hard-gated to the query's genre so a track can only ever be recommended for a
-genre it's actually tagged with. See notebooks/09_model_tfidf.ipynb.
+Genre recommender: TF-IDF over a genre/mood/tempo text descriptor per
+track, filtered to the query's genre so a track only shows up for a genre
+it's actually tagged with. See notebooks/09_model_tfidf.ipynb.
 """
 import pandas as pd
 from scipy.sparse import spmatrix
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-from src.recommendation.catalog import RESULT_COLUMNS, dedupe_by_track
-
-POOL_MULTIPLIER = 5
+from src.recommendation.catalog import RESULT_COLUMNS, finalize_results, top_candidate_indices
 
 
 def recommend_by_genre(
@@ -37,8 +35,5 @@ def recommend_by_genre(
     popularity_norm = tracks.loc[candidate_indices, "popularity"].to_numpy() / 100
 
     combined_score = relevance_weight * similarity + (1 - relevance_weight) * popularity_norm
-    ranked_order = combined_score.argsort()[::-1][: top_n * POOL_MULTIPLIER]
-    ranked_indices = candidate_indices[ranked_order]
-
-    ranked = tracks.loc[ranked_indices, RESULT_COLUMNS]
-    return dedupe_by_track(ranked, top_n).reset_index(drop=True)
+    ranked_indices = top_candidate_indices(candidate_indices, combined_score, top_n)
+    return finalize_results(tracks, ranked_indices, top_n)

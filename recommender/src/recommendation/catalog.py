@@ -1,8 +1,7 @@
 """
-Catalog lookups that don't need a trained model: substring search, popularity
-ranking, artist filtering, and resolving a free-text song name to a row in the
-tracks table. Used directly by the /popularity, /artist and /search-songs
-endpoints, and as a helper for the model-backed recommenders.
+Catalog lookups that don't need a trained model: search, popularity
+ranking, artist filtering, and matching a free-text song name to a row.
+Used by /popularity, /artist, /search-songs, and by the other recommenders.
 """
 import re
 
@@ -10,20 +9,22 @@ import pandas as pd
 
 RESULT_COLUMNS = ["track_id", "track_name", "artists", "album_name", "track_genre", "popularity"]
 
-# Qualifiers external sources append to titles that this catalog usually
-# doesn't: "(feat. X)" / "[Remastered]" groups and " - Radio Edit" suffixes.
+# How many extra results to rank before deduping. Tracks repeat across
+# genre splits, so a plain top-N is often mostly the same song.
+POOL_MULTIPLIER = 5
+
+# Strips things like "(feat. X)", "[Remastered]", or " - Radio Edit"
+# that external sources add but our catalog usually doesn't have.
 _TITLE_QUALIFIERS = re.compile(r"\s*[(\[][^)\]]*[)\]]")
 
-# Collaboration separators in external artist credits; the catalog's `artists`
-# column joins collaborators with ";" and is matched by substring, so the
-# first credited artist alone is the reliable key.
+# Splits multi-artist credits like "feat.", "&", "x", ",". Our catalog
+# only reliably matches on the first artist.
 _ARTIST_SEPARATORS = re.compile(r"\s+feat\.?\s+|\s+featuring\s+|\s+ft\.?\s+|\s+&\s+|\s+x\s+|,|;", flags=re.IGNORECASE)
 
 
 def normalize_title(title: str) -> str:
-    """Strips featuring credits and version qualifiers so externally sourced
-    titles can hit the catalog, e.g. 'Levitating (feat. DaBaby)' ->
-    'Levitating', 'Blinding Lights - Radio Edit' -> 'Blinding Lights'."""
+    """Strips featuring credits and version tags so external titles can
+    match the catalog, e.g. 'Levitating (feat. DaBaby)' -> 'Levitating'."""
     cleaned = _TITLE_QUALIFIERS.sub("", title)
     cleaned = cleaned.split(" - ")[0]
     return cleaned.strip()
@@ -38,14 +39,10 @@ def normalize_artist(artist: str) -> str:
 def resolve_external_track(
     tracks: pd.DataFrame, track_name: str, artist: str, spotify_id: str | None = None,
 ) -> int | None:
-    """Bridges an externally sourced (track, artist) pair - e.g. a Spotify
-    trending entry - to a catalog `content_index`. When `spotify_id` is given,
-    tries an exact match against the catalog's own track_id first (the local
-    dataset's track_ids are themselves real Spotify IDs, so this is a cheap,
-    reliable hit whenever the track happens to be in the older static
-    dataset); otherwise falls back to progressively looser normalizations of
-    the title and artist. Deliberately never matches on title alone: an
-    unrelated same-titled cover would silently become the model seed."""
+    """Matches an external (track, artist) pair to a catalog `content_index`.
+    Tries an exact spotify_id match first, then looser title/artist matches.
+    Never matches on title alone - a cover with the same name could get
+    picked as the seed by mistake."""
     if spotify_id:
         matches = tracks[tracks["track_id"] == spotify_id]
         if not matches.empty:
@@ -67,21 +64,38 @@ def resolve_external_track(
 
 
 def dedupe_by_track(ranked: pd.DataFrame, limit: int) -> pd.DataFrame:
-    """Collapses duplicate catalog rows for the same title/artist - this
-    dataset repeats popular tracks across multiple genre splits, so an
-    unfiltered top-N can otherwise show the same song several times. Assumes
-    `ranked` is already sorted best-first; keeps each track's best-ranked row."""
+    """Drops duplicate rows for the same title/artist, keeping the
+    best-ranked one. `ranked` must already be sorted best-first."""
     return ranked.drop_duplicates(subset=["track_name", "artists"]).head(limit)
 
 
+def finalize_results(tracks: pd.DataFrame, ranked_indices, top_n: int) -> pd.DataFrame:
+    """Last step for the ranked recommenders: picks the result columns,
+    dedupes, and resets the index."""
+    ranked = tracks.loc[ranked_indices, RESULT_COLUMNS]
+    return dedupe_by_track(ranked, top_n).reset_index(drop=True)
+
+
+def top_candidate_indices(candidate_indices, scores, top_n: int):
+    """Sorts candidates by score, best first, and keeps the top
+    `top_n * POOL_MULTIPLIER`."""
+    ranked_order = scores.argsort()[::-1][: top_n * POOL_MULTIPLIER]
+    return candidate_indices[ranked_order]
+
+
+def seed_duplicate_mask(tracks: pd.DataFrame, query_index: int) -> pd.Series:
+    """Marks rows that are duplicates of the seed track (same title +
+    artist, different genre split), so the seed can't get recommended as
+    itself."""
+    query_name = tracks.loc[query_index, "track_name"]
+    query_artists = tracks.loc[query_index, "artists"]
+    return (tracks["track_name"] == query_name) & (tracks["artists"] == query_artists)
+
+
 def find_track_index(tracks: pd.DataFrame, track_name: str, artist: str | None = None) -> int | None:
-    """Most popular catalog row matching `track_name` (case-insensitive),
-    optionally narrowed to artists containing `artist`. Mirrors how a
-    listener would type a title into the search box, not an exact-key
-    lookup - and picking the most popular match (rather than just whichever
-    row the CSV happens to list first) matters because this dataset repeats
-    common titles across many unrelated cover versions/genre splits, e.g.
-    "Blinding Lights" also exists as a kids'-compilation cover."""
+    """Finds the most popular row matching `track_name` (case-insensitive),
+    optionally narrowed by `artist`. Picks the most popular match instead of
+    just the first row, since titles repeat across unrelated covers."""
     matches = tracks[tracks["track_name"].str.lower() == track_name.lower()]
     if artist:
         matches = matches[matches["artists"].str.lower().str.contains(artist.lower(), na=False)]

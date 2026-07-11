@@ -1,11 +1,10 @@
 """
-Live music data endpoints backed by Spotify (see spotify.py): the global top
-chart, artist info and per-track metadata. Each external track is also
-resolved against the local catalog so the frontend knows whether it can be
-fed straight into the recommendation models (/recommend/from-external).
+Live data endpoints backed by Spotify (see spotify.py). Each track gets
+checked against the local catalog so we know if it can be used to seed the
+recommendation models (/recommend/from-external).
 
-Upstream failures degrade rather than error: /trending returns an empty list
-(the frontend hides the row), artist/track lookups 404 like any other miss.
+If Spotify fails, we degrade instead of erroring - /trending just returns
+an empty list, artist/track lookups 404 like a normal miss.
 """
 from fastapi import APIRouter, HTTPException, Query
 

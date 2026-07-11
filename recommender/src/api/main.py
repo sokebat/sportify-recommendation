@@ -1,24 +1,6 @@
 """
-
 Run with (from the recommender/ project root):
     uvicorn src.api.main:app --reload --port 8000
-
-
-(sportify-recommendation/frontend/src/services/api/):
-    GET  /health
-    GET  /cover/{track_id}
-    GET  /external/trending
-    GET  /external/artist/{name}
-    GET  /external/track
-    POST /recommend/similar-song
-    POST /recommend/playlist
-    POST /recommend/mood
-    POST /recommend/genre
-    POST /recommend/popularity
-    POST /recommend/artist
-    POST /recommend/search-songs
-    POST /recommend/discover
-    POST /recommend/from-external
 """
 from contextlib import asynccontextmanager
 
@@ -36,9 +18,8 @@ load_dotenv()  # SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET (see .env.example)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Missing artifacts shouldn't kill the server: the live Spotify-backed
-    # endpoints (/external/*) work without them, and the model endpoints
-    # return a clear 503 (see require_catalog) instead of a crash.
+    # Don't crash if artifacts are missing. /external/* still works without
+    # them, /recommend/* just returns 503 (see require_catalog).
     try:
         state.load()
     except FileNotFoundError as error:
@@ -63,8 +44,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Local dev only: the frontend (Next.js on :3000) and this API (:8000) run as
-# separate origins, so the browser needs CORS to call across.
+# Frontend runs on :3000, API on :8000 - different origins, so we need
+# CORS for local dev.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

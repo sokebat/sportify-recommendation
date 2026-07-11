@@ -32,8 +32,7 @@ from src.recommendation.playlist import recommend_for_playlist
 from src.recommendation.similar_song import recommend_similar_songs
 
 def require_catalog() -> None:
-    """Every /recommend endpoint needs the trained artifacts; answer with a
-    clear 503 (rather than an AttributeError 500) when they aren't built yet."""
+    """Returns 503 if the model files aren't loaded yet, instead of crashing."""
     if not state.loaded:
         raise HTTPException(
             status_code=503,
@@ -46,9 +45,8 @@ def require_catalog() -> None:
 
 router = APIRouter(prefix="/recommend", tags=["recommendations"], dependencies=[Depends(require_catalog)])
 
-# Spotify's genre taxonomy is full of micro-genres ("dance pop", "alt z")
-# that don't land on a catalog genre slug as-is (recommend_by_genre
-# substring-matches on the first word of the query) - map the common ones.
+# Spotify uses genres like "dance pop" or "alt z" that don't match our
+# catalog genres directly. Map the common ones here.
 SPOTIFY_GENRE_ALIASES = {
     "r&b": "r-n-b",
     "rhythm and blues": "r-n-b",
@@ -130,11 +128,8 @@ def discover(payload: SimilarSongRequest) -> RecommendationsResponse:
 
 @router.post("/from-external")
 async def from_external(payload: ExternalRecommendRequest) -> ExternalRecommendationsResponse:
-    """Recommendations seeded by a track that came from Spotify (the trending
-    chart, an artist's popular tracks) rather than the catalog. The models
-    only know the catalog, so the external track is bridged in with a
-    fallback chain: exact track match (by Spotify ID, then by name) -> the
-    artist's most popular catalog track -> its genre."""
+    """Recommends songs from a Spotify track instead of a catalog one. Tries
+    an exact match first, then the artist's top song, then just the genre."""
     index = resolve_external_track(state.tracks, payload.track, payload.artist, spotify_id=payload.spotify_id)
     if index is not None:
         seed = state.tracks.loc[[index], RESULT_COLUMNS].to_dict(orient="records")[0]
@@ -156,9 +151,8 @@ async def from_external(payload: ExternalRecommendRequest) -> ExternalRecommenda
                 results=_to_songs(recs), matched_by="artist", seed=Song(**seed),
             )
 
-    # Last resort: recommend within the track's genre. The payload usually
-    # carries it (trending items do); otherwise ask Spotify - tracks don't
-    # carry genre themselves, so this falls back to the artist's genres.
+    # Last resort: just recommend by genre. Trending tracks already have
+    # one; otherwise ask Spotify for the artist's genres.
     genre = payload.genre
     if not genre:
         artist_info = await fetch_artist_by_name(payload.artist)
